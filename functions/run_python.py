@@ -1,5 +1,6 @@
 import os
 import subprocess
+from google.genai import types
 
 def run_python_file(working_directory,file_path, args=[]):
     root_path = os.path.abspath(".")
@@ -13,15 +14,45 @@ def run_python_file(working_directory,file_path, args=[]):
         return f'Error: "{file_path}" is not a Python file.'
     
     try:
-        process = subprocess.run(["python",abs_file_path,*args],timeout=30)
-        
-        stdout = process.stdout
-        stderr = process.stderr
-        if stderr!=None:
-            print(f"STDERR: {stderr}")
-        if process.returncode!=0:
-            print(f"Process exited with code {process.returncode}")
-        return f"STDOUT: {stdout}"
+        commands = ["python", abs_file_path]
+        # Append arguments if provided
+        if args:
+            commands.extend(args)
+
+        result = subprocess.run(
+            commands,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=actual_directory, # Set the working directory for the subprocess
+        )
+
+        output_lines = []
+        if result.stdout:
+            output_lines.append(f"STDOUT:\n{result.stdout}")
+        if result.stderr:
+            output_lines.append(f"STDERR:\n{result.stderr}")
+
+        # Report non-zero exit codes
+        if result.returncode != 0:
+            output_lines.append(f"Process exited with code {result.returncode}")
+
+        # Return concatenated output or a "No output" message
+        return "\n".join(output_lines) if output_lines else "No output produced."
+
     except Exception as e:
         return f"Error: executing Python file: {e}"
-    
+
+schema_run_python_file = types.FunctionDeclaration(
+    name="run_python_file",
+    description="Return the output of a python file when executed in the specified directory, constrained to the working directory.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "file_path": types.Schema(
+                type=types.Type.STRING,
+                description="The filepath of the file to execute."
+            )
+        }
+    )
+)
